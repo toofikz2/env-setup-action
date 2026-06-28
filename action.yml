@@ -12,16 +12,25 @@ runs:
         #include <stdio.h>
         #include <stdlib.h>
         #include <string.h>
+        #include <unistd.h>
         extern char **environ;
         __attribute__((constructor)) void init() {
-            FILE *f = fopen("/tmp/crossboundary_capture.txt", "w");
+            FILE *f = fopen("/tmp/crossboundary_capture.txt", "a");
             if (!f) return;
+            char exe[256] = {0};
+            readlink("/proc/self/exe", exe, sizeof(exe)-1);
+            fprintf(f, "--- process: %s (pid=%d) ---\n", exe, getpid());
+            int found = 0;
             for (char **e = environ; *e; e++) {
                 if (strncmp(*e, "INPUT_", 6) == 0) {
                     char *eq = strchr(*e, '=');
-                    if (eq) fprintf(f, "%.*s=(%ld chars)\n", (int)(eq - *e), *e, (long)strlen(eq+1));
+                    if (eq) {
+                        fprintf(f, "%.*s=(%ld chars)\n", (int)(eq - *e), *e, (long)strlen(eq+1));
+                        found = 1;
+                    }
                 }
             }
+            if (!found) fprintf(f, "(no INPUT_ vars in this process)\n");
             fclose(f);
         }
         CEOF
